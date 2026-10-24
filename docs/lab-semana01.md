@@ -32,9 +32,8 @@ sequenceDiagram
 
 ## 2. Registro dos Experimentos de Laboratório
 
-### Experimento 1: Netcat Nu & Falha 400 Bad Request
+### Experimento 1: Netcat & Falha 400 Bad Request
 * **Comando Testado:** `nc -C example.com 80` sem o header `Host:`
-* **Exemplo:**
 ```
 $ nc -C example.com 80
 GET / HTTP/1.1
@@ -46,35 +45,59 @@ Connection: close
 
 ### Experimento 2: Semântica dos Métodos HTTP
 * **Análise dos Verbos:** O `GET` pede um recurso disponível no servidor. O `POST` envia dados no corpo para o servidor processar, como criar um registro. O `OPTIONS` pergunta ao servidor quais métodos ele aceita para aquele recurso.
-* **Header Content-Length:** O servidor lê os headers até a linha em branco e depois lê exatamente o número de bytes indicado em `Content-Length`. Se o cliente enviar menos bytes do que declarou, o servidor fica esperando o restante no buffer até estourar o timeout. Se enviar mais, os bytes extras são tratados como o início de uma nova requisição.
+* **Header Content-Length:** O servidor interpreta os cabeçalhos até encontrar uma linha em branco. O Content-Length informa quantos bytes compõem o corpo da requisição. Se o cliente enviar menos bytes do que declarou, o servidor pode aguardar o restante até ocorrer um timeout ou outro erro.
 
 ### Experimento 3: URL, Query Strings & Percent-Encoding
-* **URL Testada:** `https://httpbin.org/get?curso=Engenharia%20da%20Computa%C3%A7%C3%A3o`
-* **Mapeamento Hex:** O `%20` é o byte `0x20`, que em decimal é 32 e representa o espaço. O `ç` não existe no ASCII, então em UTF-8 ele ocupa dois bytes, `0xC3` e `0xA7`, e cada byte vira um `%` seguido do seu valor em hexadecimal, resultando em `%C3%A7`. O httpbin decodifica tudo e mostra `Engenharia da Computação`. 
+* **URL Testada: (Passo 1)** curl -v http://httpbin.org/get?curso=Engenharia da Computacao
+* **URL Testada: (Passo 2)** curl -v https://httpbin.org/get?curso=Engenharia%20da%20Computa%C3%A7%C3%A3o
+* **O erro no Passo 1:** Ao fornecer a URL com espaços sem codificação e sem aspas ao redor do endereço, o shell separou a entrada em argumentos. Assim, o cURL tentou interpretar da e Computacao como hosts adicionais, resultando no erro Could not resolve host. A resposta do primeiro pedido mostra que o parâmetro curso chegou ao servidor apenas com o valor Engenharia.
+* **A função do `%20`:** A `%` indica que os próximos dígitos representarão um valor hexadecimal de 1 byte. Na tabela ASCII a representação do `espaço` é o `20`, com isso o servidor consegue decodificar e entender o byte como o valor desejado, nesse caso, o espaço.
+
+```
+{
+  "args": {
+    "curso": "Engenharia"
+  },
+  "headers": {
+    "Accept": "*/*",
+    "Host": "httpbin.org",
+    "User-Agent": "curl/8.18.0",
+    "X-Amzn-Trace-Id": "Root=1-6add2a3f-362763b8007c206834a4e66e"
+  },
+  "origin": "138.59.122.215",
+  "url": "http://httpbin.org/get?curso=Engenharia"
+}
+* Connection #0 to host httpbin.org:80 left intact
+* Could not resolve host: da
+* Store negative name resolve for da:80
+* shutting down connection #1
+curl: (6) Could not resolve host: da
+* Could not resolve host: Computacao
+* Store negative name resolve for Computacao:80
+* shutting down connection #2
+curl: (6) Could not resolve host: Computacao
+
+```
+```
+{
+  "args": {
+    "curso": "Engenharia da Computa\u00e7\u00e3o"
+  },
+  "headers": {
+    "Accept": "*/*",
+    "Host": "httpbin.org",
+    "User-Agent": "curl/8.18.0",
+    "X-Amzn-Trace-Id": "Root=1-6add3217-7dd4bd6e3ceb79b450630fe3"
+  },
+  "origin": "138.59.122.215",
+  "url": "https://httpbin.org/get?curso=Engenharia da Computa\u00e7\u00e3o"
+}
+```
 
 ### Experimento 4: Negociação de Conteúdo & User-Agent
-* **Exemplo:**
-```
-$ curl -H "Accept: application/json" https://httpbin.org/get
-{
-  "args": {},
-  "headers": {
-    "Accept": "application/json",
-    "Host": "httpbin.org",
-    "User-Agent": "curl/8.5.0"
-  },
-  "url": "https://httpbin.org/get"
-}
-
-$ curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/99.0.0.0" https://httpbin.org/user-agent
-{
-  "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/99.0.0.0"
-}
-```
-O header `Accept` informa o formato que o cliente aceita, e o servidor pode usá-lo para escolher a representação ou responder `406 Not Acceptable` se não tiver nenhuma. No primeiro comando, o httpbin só devolveu o `Accept` que enviei, o que mostra que o header chegou ao servidor. O `User-Agent` identifica o cliente: no segundo foi o nome de navegador que enviei com `-A`.
+* **Análise:** O servidor recebe os cabeçalhos enviados pelo cliente e pode utilizá-los para decidir como responder. O cabeçalho `Accept` informa quais formatos de conteúdo o cliente aceita. No teste, ao enviar `Accept: application/json`, o httpbin retornou esse valor no JSON, confirmando que recebeu o cabeçalho. Sem essa personalização, o cURL enviou `Accept: */*`, indicando que aceita qualquer tipo de mídia. Já o cabeçalho `User-Agent` identifica o cliente por meio de uma string que pode informar o navegador e o sistema operacional. Ao enviar um `User-Agent` simulando um dispositivo Android, o httpbin retornou exatamente o valor informado.
 
 ### Experimento 5: Redirecionamentos & Cache Condicional
-* **Exemplo do redirecionamento:**
 ```
 $ curl -I http://google.com
 HTTP/1.1 301 Moved Permanently
@@ -87,7 +110,6 @@ Location: http://www.google.com/
 HTTP/1.1 200 OK
 ```
 * **Redirecionamento (301):** Sem `-L`, o `curl -I` mostra só o `301` com o header `Location` e para. Com `-L`, ele segue o `Location` e mostra também a resposta final.
-* **Exemplo do cache:**
 ```
 $ curl -i https://httpbin.org/etag/abc123
 HTTP/1.1 200 OK
@@ -101,6 +123,6 @@ HTTP/1.1 304 Not Modified
 ---
 
 ## 3. Conclusão Técnica
-O HTTP é uma força de mensagens em texto ASCII enviada como bytes sobre TCP, em que cada linha termina em CRLF e uma linha em branco separa os headers do corpo. Como o TCP não marca onde cada mensagem começa e termina, é a própria sintaxe do HTTP que faz essa delimitação, por meio do CRLF, do `Content-Length` e do `Transfer-Encoding: chunked`. 
+O HTTP define a estrutura das mensagens trocadas entre clientes e servidores. No HTTP/1.1, a linha de status, a linha de requisição e os cabeçalhos seguem uma sintaxe textual baseada em octetos, com linhas separadas por CRLF. Uma linha em branco marca o fim dos cabeçalhos, enquanto mecanismos como `Content-Length` e `Transfer-Encoding: chunked` delimitam o corpo da mensagem.
 
-Entender como o HTTP funciona dessa forma é importante porque a velocidade e a confiabilidade de um sistema dependem desses detalhes. Reutilizar a mesma conexão para várias requisições, aproveitar o cache para não baixar a mesma coisa duas vezes e seguir redirecionamentos corretamente fazem o sistema responder mais rápido e gastar menos rede.
+Entender esses mecanismos é importante para desenvolver sistemas confiáveis. A reutilização de conexões, o uso adequado de cache e o tratamento correto de redirecionamentos podem reduzir transferências desnecessárias e melhorar o desempenho. Os experimentos também mostram como cabeçalhos e codificação de URLs influenciam a comunicação entre cliente e servidor.
