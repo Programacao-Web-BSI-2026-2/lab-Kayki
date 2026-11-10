@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="keywords" content="HTML, Formuário, Abrir Chamado Mecânico">
+    <meta name="robots" content="index, follow">
+    <meta name="author" content="Kayki Santana Guimarães">
+    <title>Document</title>
+</head>
+<body>
+    <form action="https://httpbin.org/post" method="POST" enctype="multipart/form-data">
+        <fieldset>
+            <legend>Abrir Chamado Técnico</legend>
+        
+            <div class="campo">
+                <label for="nome">Nome Completo:</label>
+                <input required id="nome" type="text" name="nome">
+            </div>
+
+            <div class="campo">
+                <label for="email">E-mail de Contato:</label>
+                <input required id="email" type="email" name="email">
+            </div>
+
+            <div class="campo">
+                <label for="prioridade">Prioridade:</label>
+                <select id="prioridade">
+                    <option value="baixa">Baixa</option>
+                    <option value="media">Média</option>
+                    <option value="alta">Alta</option>
+                </select>
+            </div>
+
+            <div class="campo">
+                <label>Arquivo de Log ou Print (PNG/PDF):</label>
+                <input required aria-describedby="envio-arquivo-descricao" accept="image/png,application/pdf" type="file" name="anexo">
+                <small id="envio-arquivo-descricao">Enviar aquivo em formato PDF ou PNG</small>
+            </div>
+
+            
+            <button type="submit" onclick="alert('Enviado')">Enviar Chamado</button>
+
+        </fieldset>
+    </form>
+</div>
+</body>
+</html>
